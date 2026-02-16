@@ -1,10 +1,14 @@
 {
   "name": "romel-fps-multiplayer",
   "version": "1.0.0",
-  "description": "Romel FPS Multiplayer Server with Room Codes",
+  "description": "Romel FPS Multiplayer Server",
   "main": "server.js",
+  "type": "commonjs",
   "scripts": {
     "start": "node server.js"
+  },
+  "engines": {
+    "node": "18.x"
   },
   "dependencies": {
     "express": "^4.18.2",
