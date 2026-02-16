@@ -13,105 +13,101 @@ app.get("/", (req, res) => {
 
 let rooms = {};
 
-function createRoom(code) {
-    if (!rooms[code]) {
-        rooms[code] = { players: {} };
-        console.log("Room created:", code);
+function createRoom(code){
+    if(!rooms[code]){
+        rooms[code] = { players:{} };
     }
 }
 
-function removePlayer(room, id) {
-    if (!rooms[room]) return;
-    delete rooms[room].players[id];
-    if (Object.keys(rooms[room].players).length === 0) {
-        delete rooms[room];
-        console.log("Room deleted:", room);
-    }
-}
-
-wss.on("connection", (ws) => {
+wss.on("connection", (ws)=>{
     let playerId = uuidv4();
     let roomCode = null;
 
-    ws.on("message", (message) => {
-        let data;
-        try {
-            data = JSON.parse(message);
-        } catch {
-            return;
-        }
+    ws.on("message", (message)=>{
+        const data = JSON.parse(message);
 
-        if (data.type === "join") {
+        if(data.type === "join"){
             roomCode = data.room.toUpperCase();
             createRoom(roomCode);
 
             rooms[roomCode].players[playerId] = {
                 id: playerId,
-                x: Math.random() * 10 - 5,
+                x: 0,
                 y: 1.8,
-                z: Math.random() * 10 - 5,
+                z: 0,
                 rotY: 0,
                 health: 100,
                 kills: 0
             };
 
             ws.send(JSON.stringify({
-                type: "init",
+                type:"init",
                 id: playerId
             }));
         }
 
-        if (data.type === "update" && roomCode) {
-            const player = rooms[roomCode]?.players[playerId];
-            if (!player) return;
+        if(data.type === "update" && roomCode){
+            const p = rooms[roomCode].players[playerId];
+            if(!p) return;
 
-            player.x = data.state.x;
-            player.y = data.state.y;
-            player.z = data.state.z;
-            player.rotY = data.state.rotY;
+            p.x = data.state.x;
+            p.y = data.state.y;
+            p.z = data.state.z;
+            p.rotY = data.state.rotY;
         }
 
-        if (data.type === "shoot" && roomCode) {
-            const shooter = rooms[roomCode]?.players[playerId];
-            if (!shooter) return;
+        if(data.type === "shoot" && roomCode){
+            const shooter = rooms[roomCode].players[playerId];
+            if(!shooter) return;
 
-            for (let id in rooms[roomCode].players) {
-                if (id === playerId) continue;
+            const maxDistance = 20;
+            const hitRadius = 1.2;
+            const forwardX = Math.sin(shooter.rotY);
+            const forwardZ = Math.cos(shooter.rotY);
+
+            for(let id in rooms[roomCode].players){
+                if(id === playerId) continue;
 
                 const target = rooms[roomCode].players[id];
 
-                const dx = shooter.x - target.x;
-                const dz = shooter.z - target.z;
-                const distance = Math.sqrt(dx * dx + dz * dz);
+                const dx = target.x - shooter.x;
+                const dz = target.z - shooter.z;
+                const distance = Math.sqrt(dx*dx + dz*dz);
 
-                if (distance < 2) {
-                    target.health -= 20;
+                if(distance > maxDistance) continue;
 
-                    if (target.health <= 0) {
+                const dot = (dx*forwardX + dz*forwardZ) / distance;
+
+                if(dot > 0.95){ // aiming close enough
+                    target.health -= 25;
+
+                    if(target.health <= 0){
                         shooter.kills++;
                         target.health = 100;
-                        target.x = Math.random() * 20 - 10;
-                        target.z = Math.random() * 20 - 10;
+                        target.x = (Math.random()-0.5)*20;
+                        target.z = (Math.random()-0.5)*20;
                     }
                 }
             }
         }
     });
 
-    ws.on("close", () => {
-        if (roomCode) removePlayer(roomCode, playerId);
+    ws.on("close", ()=>{
+        if(roomCode && rooms[roomCode]){
+            delete rooms[roomCode].players[playerId];
+        }
     });
 });
 
-setInterval(() => {
-    for (let room in rooms) {
+setInterval(()=>{
+    for(let room in rooms){
         const payload = JSON.stringify({
-            type: "state",
+            type:"state",
             players: rooms[room].players
         });
 
-        wss.clients.forEach(client => {
-            if (client.readyState === WebSocket.OPEN) {
+        wss.clients.forEach(client=>{
+            if(client.readyState === WebSocket.OPEN){
                 client.send(payload);
             }
         });
@@ -120,6 +116,6 @@ setInterval(() => {
 
 const PORT = process.env.PORT || 3000;
 
-server.listen(PORT, () => {
+server.listen(PORT, ()=>{
     console.log("Server running on port", PORT);
 });
